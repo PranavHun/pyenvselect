@@ -60,11 +60,29 @@ fn get_shell() -> String {
     shell
 }
 
-fn main() {
-    let home_dir = std::env::var("HOME").unwrap();
+fn directory_walk(line: &str) -> Vec<String> {
+    let mut retvec = Vec::<String>::new();
+    let iter = std::fs::read_dir(line).unwrap();
+    for direntry in iter {
+        let entry = direntry.unwrap();
+        let file_type = entry.file_type().unwrap();
+        if file_type.is_file() {
+            if entry.file_name() == "pyvenv.cfg" {
+                retvec.push(String::from(entry.path().to_str().unwrap()));
+            }
+        }
 
+        if file_type.is_dir() {
+            retvec.extend(directory_walk(entry.path().to_str().unwrap().clone()));
+        }
+    }
+    retvec
+}
+
+fn main() {
     let _ = match std::env::consts::FAMILY {
         "unix" => {
+            let home_dir = std::env::var("HOME").unwrap();
             let shell = get_shell();
             println!("Current Shell : {}", text_bold(&shell));
             println!("");
@@ -144,7 +162,22 @@ fn main() {
             // TODO: Using the shell, activate
             // the env file
         }
-        "windows" => todo!(),
+        "windows" => {
+            let home_dir =
+                std::env::var("HOMEDRIVE").unwrap() + &std::env::var("HOMEPATH").unwrap();
+            let file_name = format!("{home_dir}\\.config\\pyvenvselect\\searchdirs");
+            let fl = std::fs::read_to_string(file_name).unwrap();
+
+            for line in fl.lines() {
+                let env_dirs = directory_walk(line);
+                for env_dir in env_dirs {
+                    println!(
+                        "{}Scripts\\activate",
+                        &env_dir[0..env_dir.len() - "pyvenv.cfg".len()]
+                    );
+                }
+            }
+        }
         _ => todo!(),
     };
 }
